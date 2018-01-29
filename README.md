@@ -17,16 +17,15 @@ $locker->free();
 ```php
 //...
 class ControllerWithLock extends Controller{
-  //...
+  //$this->locker = new ProcessLock;
   public function beforeAction($action) 
   {
       if (!parent::beforeAction($action)) {
           return false;
       }
-      //...
       //lock process//uid of process controller_id+action_id
       $this->locker->setType($action->controller->id.$action->id);
-      //check for lock file and lock
+      //check for lock file
       if($this->locker->check()){
           //lock process
           $this->locker->lock();
@@ -38,7 +37,7 @@ class ControllerWithLock extends Controller{
   public function afterAction($action, $result)
   {
       $result = parent::afterAction($action, $result);
-      //free process
+      //free lock 
       $this->locker->free();
       //
       return $result;
