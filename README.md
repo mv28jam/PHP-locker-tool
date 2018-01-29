@@ -1,7 +1,7 @@
 # Loc process tool
 helps to check for running 1 process by uid of process
 
-``
+```php
 //create lock with string uid
 $locker= new ProcessLock('my_process_id');
 //set tmp lock dir
@@ -12,10 +12,9 @@ $locker->checkAndLock();
 $locker->setEcho(false);
 //free lock after execution
 $locker->free();
-``
+```
 ## Yii2 console process lock realisation example
-
-``
+```php
 //...
 class ControllerWithLock extends Controller{
   //...
@@ -44,4 +43,4 @@ class ControllerWithLock extends Controller{
       //
       return $result;
   }
-``
+```
