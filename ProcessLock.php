@@ -9,10 +9,8 @@
  * 
  * local execution // local file system
  * 
- * 
  * @author   Mihail Ershov - mv28jam <mv28jam@yandex.ru>
- * @version  
- * 
+ * @version  1.2
  */
 class ProcessLock{
     /**
@@ -73,6 +71,7 @@ class ProcessLock{
      * set path to store lock files
      * @param string $in path to dir with locks
      * @return bool true on on writable dir
+     * @throws E_USER_WARNING
      */
     public function setDir(string $in):bool
     {
@@ -147,6 +146,7 @@ class ProcessLock{
      * check for process with id is running
      * @param int $pid - id of process
      * @return bool
+     * @throws E_USER_WARNING
      */
     private function checkForPid(int $pid):bool
     {
@@ -175,6 +175,7 @@ class ProcessLock{
     /**
      * locks process with this name $type
      * @return boolean true if lock
+     * @throws E_USER_WARNING
      */
     public function lock(): bool
     {
