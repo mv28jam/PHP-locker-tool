@@ -110,7 +110,7 @@ class ProcessLock{
      * alia to check then lock
      * @see lock 
      */
-    public function checkLock():bool
+    public function checkAndLock():bool
     {
         if($this->check()){
             return $this->lock();
