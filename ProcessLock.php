@@ -10,29 +10,39 @@
  * local execution // local file system
  * 
  * @author   Mihail Ershov - mv28jam <mv28jam@yandex.ru>
- * @version  1.2
+ * @version  1.2.1
  */
 class ProcessLock{
+        
+    /**
+     * ps output marker
+     */
+    const PID = 'PID';
+    /**
+     * php marker
+     */
+    const PHP_MARKER = 'php';
+    
     /**
      * @var string name of lock file = id of work
      */
-    protected $type='default';
+    protected $type = 'default';
     /**
      * @var int pid of process
      */
-    protected $pid=null;
+    protected $pid = null;
     /**
      * @var string full filename
      */
-    protected $file_name='';
+    protected $file_name = '';
     /**
      * @var boolean echo lock/unlock messages
      */
-    protected $is_echo=true;    
+    protected $is_echo = true;    
     /**
      * @var string locks file directory 
      */
-    protected $dir='/tmp';
+    protected $dir = '/tmp';
     
     
     
@@ -40,7 +50,7 @@ class ProcessLock{
      * 
      * @param string $in some name of process
      */
-    public function __construct(string $in='') 
+    public function __construct(string $in = '') 
     {
         if(!empty($in)){
             $this->setType($in);
@@ -53,7 +63,7 @@ class ProcessLock{
      */
     public function setEcho(bool $show)
     {
-        $this->is_echo=$show;
+        $this->is_echo = $show;
     }
     
     /**
@@ -126,7 +136,7 @@ class ProcessLock{
      */
     public function check()
     {
-        $res=array();
+        $res = array();
         //---
         $this->nameGen();
         if(
@@ -146,28 +156,46 @@ class ProcessLock{
      * check for process with id is running
      * @param int $pid - id of process
      * @return bool
-     * @throws E_USER_WARNING
+     * @throws E_USER_WARNING or E_USER_NOTICE
      */
     private function checkForPid(int $pid):bool
     {
-        $er_mes='Can not check process id with "ps -p". LOCK is imaginary.';
+        //define messages
+        $er_mes = 'Can not check process id with "ps -p". LOCK is imaginary.';
+        $er_mes_no_php='Process of pid exist, but not PHP precess';
         //get process with pid
-        $res=array_filter(explode("\n",shell_exec('ps -p '.$pid)));
-        //
-        if(empty($res)){
+        $res = array_filter(explode("\n",shell_exec('ps -p '.$pid)));
+        //check for output
+        //if empty 'ps -p' is forbidden
+        //if in first line of output do not contains PID string
+        if(empty($res) or strpos($res[0], self::PID)===false){
+            //no valid ps -p output
             $this->lecho($er_mes);
             user_error($er_mes, E_USER_WARNING);
             $this->free();
             return true;
         }else{
-            if(count($res)<2){
-                $this->lecho('WARNING:Lock file is old. No process of this lock file.');
-                $this->free();
-                return true;
-            }else{
-                $res=array_filter(explode(' ',$res[1]));
-                $this->lecho('LOCKED. Lock is valid. Process of '.end($res).' '.$pid.' is running. ');
-                return false;
+            //check for 'ps -p' output
+            switch(true){
+                case(count($res)<2):
+                    //check for process output
+                    $this->lecho('WARNING:Lock file is old. No process of this lock file.');
+                    $this->free();
+                    return true;
+                case(true):
+                    //check for process is php
+                    //reset $res !
+                    $res = array_filter(explode(' ',$res[1]));
+                    if(strpos(end($res), self::PHP_MARKER)===false){
+                        //process with pid exist but not PHP process / collision
+                        $this->lecho($er_mes_no_php);
+                        user_error($er_mes_no_php, E_USER_NOTICE);
+                        $this->free();
+                        return true;
+                    }
+                default:
+                    $this->lecho('LOCKED. Lock is valid. Process of '.end($res).' '.$pid.' is running. ');
+                    return false;
             }
         }
     }
@@ -180,7 +208,7 @@ class ProcessLock{
     public function lock(): bool
     {
         $this->nameGen();
-        var_dump($this->file_name);
+        //check for write
         if(is_writeable($this->dir)){
             if(!file_exists($this->file_name)){
                 file_put_contents($this->file_name,getmypid());
