@@ -172,7 +172,6 @@ class ProcessLock{
             //no valid ps -p output
             $this->lecho($er_mes);
             user_error($er_mes, E_USER_WARNING);
-            $this->free();
             return true;
         }else{
             //check for 'ps -p' output
