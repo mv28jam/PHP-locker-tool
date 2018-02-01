@@ -61,7 +61,6 @@ class ProcessLock{
     protected $dir = '/tmp';
     
     
-    
     /**
      * 
      * @param string $in some name of process
