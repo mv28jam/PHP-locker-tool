@@ -22,6 +22,22 @@ class ProcessLock{
      * php marker
      */
     const PHP_MARKER = 'php';
+    /**
+     * locker error messages
+     */
+    const LCR_ER_WRITE = 'Trying to set not writable path for ProcessLock';
+    const LCR_ER_WRITE_TMP = 'Can not write in default dir($this->dir)';
+    const LCR_ER_PID = 'Can not check process id with "ps -p". LOCK is imaginary.';
+    const LCR_ER_NO_PHP = 'Process of pid exist, but not PHP process';
+    const LCR_ER_OLD = 'WARNING:Lock file is old. No process of this lock file.';
+    /**
+     * locker messages
+     */
+    const LCR_LOСKED = 'LOCKED.';
+    const LCR_UNLOСKED = 'UNLOCKED.';
+    const LCR_ALREADY_LOСKED = 'WARNING:Already locked.';
+    const LCR_LOСK_NO_EXIST = 'WARNING:Lock file does not exists - NO LOCK.';
+    const LCR_LOСK_VALID = 'LOCKED. Lock is valid. Process of %1 %2 is running. ';
     
     /**
      * @var string name of lock file = id of work
@@ -89,7 +105,7 @@ class ProcessLock{
             $this->$dir = $in; 
             return true;
         }else{
-            user_error('Trying to set not writable path for ProcessLock', E_USER_WARNING);
+            user_error(self::LCR_ER_WRITE, E_USER_WARNING);
             return false;
         }
         
@@ -160,9 +176,6 @@ class ProcessLock{
      */
     private function checkForPid(int $pid):bool
     {
-        //define messages
-        $er_mes = 'Can not check process id with "ps -p". LOCK is imaginary.';
-        $er_mes_no_php='Process of pid exist, but not PHP precess';
         //get process with pid
         $res = array_filter(explode("\n",shell_exec('ps -p '.$pid)));
         //check for output
@@ -170,15 +183,15 @@ class ProcessLock{
         //if in first line of output do not contains PID string
         if(empty($res) or strpos($res[0], self::PID)===false){
             //no valid ps -p output
-            $this->lecho($er_mes);
-            user_error($er_mes, E_USER_WARNING);
+            $this->lecho(self::LCR_ER_PID);
+            user_error(self::LCR_ER_PID, E_USER_WARNING);
             return true;
         }else{
             //check for 'ps -p' output
             switch(true){
                 case(count($res)<2):
                     //check for process output
-                    $this->lecho('WARNING:Lock file is old. No process of this lock file.');
+                    $this->lecho(self::LCR_ER_OLD);
                     $this->free();
                     return true;
                 case(true):
@@ -187,13 +200,13 @@ class ProcessLock{
                     $res = array_filter(explode(' ',$res[1]));
                     if(strpos(end($res), self::PHP_MARKER)===false){
                         //process with pid exist but not PHP process / collision
-                        $this->lecho($er_mes_no_php);
-                        user_error($er_mes_no_php, E_USER_NOTICE);
+                        $this->lecho(self::LCR_ER_NO_PHP);
+                        user_error(self::LCR_ER_NO_PHP, E_USER_NOTICE);
                         $this->free();
                         return true;
                     }
                 default:
-                    $this->lecho('LOCKED. Lock is valid. Process of '.end($res).' '.$pid.' is running. ');
+                    $this->lecho(str_replace(['%1','%2'], [end($res), $pid], self::LCR_LOСK_VALID));
                     return false;
             }
         }
@@ -211,14 +224,15 @@ class ProcessLock{
         if(is_writeable($this->dir)){
             if(!file_exists($this->file_name)){
                 file_put_contents($this->file_name,getmypid());
-                $this->lecho('LOCKED.');
+                $this->lecho(self::LCR_LOСKED);
+                sleep(10);
                 return true;
             }else{
-                $this->lecho('WARNING:Already locked.');
+                $this->lecho(self::LCR_ALREADY_LOСKED);
                 return false;
             }
         }else{
-            user_error('Can not write in default dir($this->dir)', E_USER_WARNING);
+            user_error(self::LCR_ER_WRITE_TMP, E_USER_WARNING);
             return false; 
         }
     }
@@ -232,10 +246,10 @@ class ProcessLock{
         $this->nameGen();
         if(file_exists($this->file_name)){
             unlink($this->file_name);
-            $this->lecho('UNLOCKED.');
+            $this->lecho(self::LCR_UNLOСKED);
             return true;
         }else{
-            $this->lecho('WARNING:Lock file does not exists - NO LOCK.');
+            $this->lecho(self::LCR_LOСK_NO_EXIST);
             return false;
         }
     }
