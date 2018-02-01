@@ -225,7 +225,6 @@ class ProcessLock{
             if(!file_exists($this->file_name)){
                 file_put_contents($this->file_name,getmypid());
                 $this->lecho(self::LCR_LOСKED);
-                sleep(10);
                 return true;
             }else{
                 $this->lecho(self::LCR_ALREADY_LOСKED);
