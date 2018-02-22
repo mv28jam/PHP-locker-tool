@@ -29,7 +29,7 @@ class ProcessLock{
     const LCR_ER_WRITE_TMP = 'Can not write in default dir($this->dir)';
     const LCR_ER_PID = 'Can not check process id with "ps -p". LOCK is imaginary.';
     const LCR_ER_CHK_FAIL = 'Process check result unexpected.';
-    const LCR_ER_CHK_FAIL2 = 'Process check return status 0 unexpected lines count < 2.';
+    const LCR_ER_CHK_FAIL2 = 'Process check return status 0, otherwice unexpected lines count < 2.';
     const LCR_ER_NO_PHP = 'Process of pid exist, but not PHP process';
     const LCR_ER_OLD = 'WARNING:Lock file is old. No process of this lock file.';
     /**
