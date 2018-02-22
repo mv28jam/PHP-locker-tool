@@ -10,7 +10,7 @@
  * local execution // local file system
  * 
  * @author   Mihail Ershov - mv28jam <mv28jam@yandex.ru>
- * @version  1.2.1
+ * @version  1.2.4
  */
 class ProcessLock{
         
@@ -29,6 +29,7 @@ class ProcessLock{
     const LCR_ER_WRITE_TMP = 'Can not write in default dir($this->dir)';
     const LCR_ER_PID = 'Can not check process id with "ps -p". LOCK is imaginary.';
     const LCR_ER_CHK_FAIL = 'Process check result unexpected.';
+    const LCR_ER_CHK_FAIL2 = 'Process check return status 0 unexpected lines count < 2.';
     const LCR_ER_NO_PHP = 'Process of pid exist, but not PHP process';
     const LCR_ER_OLD = 'WARNING:Lock file is old. No process of this lock file.';
     /**
@@ -38,9 +39,9 @@ class ProcessLock{
     const LCR_UNLOСKED = 'UNLOCKED.';
     const LCR_ALREADY_LOСKED = 'WARNING:Already locked.';
     const LCR_LOСK_NO_EXIST = 'WARNING:Lock file does not exists - NO LOCK.';
-    const LCR_LOСK_VALID = 'LOCKED. Lock is valid. Process of %1 %2 is running. ';
+    const LCR_LOСK_VALID = 'Lock is valid. Process of %1 %2 is running. ';
     
-    /**
+    /**git 
      * @var string name of lock file = id of work
      */
     protected $type = 'default';
@@ -72,6 +73,14 @@ class ProcessLock{
      * @var boolean if true check for php in launch command 
      */
     public $check_marker = true;
+    /**
+     * Paranoid or simple-jack strategy
+     * in case of error (we do not know process state):
+     * - false: free lock, exec script
+     * - true: do NOT touch uncheckable lock, do NOT run new process
+     * @var boolean flag
+     */
+    public $paranoid_strategy = false;
     
     
     /**
@@ -143,6 +152,19 @@ class ProcessLock{
     }
     
     /**
+     * return true and free due to strategy
+     * @return bool
+     */
+    protected function errorStrategyBool() : bool{
+        if($this->paranoid_strategy){
+            return true;
+        }else{
+            $this->free();
+            return true;
+        }
+    }
+    
+    /**
      * echo with echo on check
      * @param string $in string to echo
      */
@@ -204,7 +226,7 @@ class ProcessLock{
     /**
      * check for process with id is running
      * @param int $pid - id of process
-     * @return bool // true if pid is dead and process can lock, false if pid is live
+     * @return bool // true if pid is dead and process can lock, false otherwice 
      * @throws E_USER_WARNING or E_USER_NOTICE
      */
     private function checkForPid(int $pid):bool
@@ -214,22 +236,25 @@ class ProcessLock{
         //
         switch(true){
             //'ps -p' is forbidden or ktulhu
-            case($status > 1):   
-                $this->lecho(self::LCR_ER_PID);
-                user_error(self::LCR_ER_PID, E_USER_WARNING);
-                return true;
+            case($status > 1):
+                $this->errorActions(self::LCR_ER_PID);
+                return $this->errorStrategyBool();
             //command executed with result 0, but output is undefined or in wrong format
             case(!isset($res[0]) or strpos($res[0], self::PID)===false):
                 //result is unexpected
-                $this->lecho(self::LCR_ER_CHK_FAIL);
-                user_error(self::LCR_ER_CHK_FAIL, E_USER_WARNING);    
-                return true;    
+                $this->errorActions(self::LCR_ER_CHK_FAIL);
+                return $this->errorStrategyBool();    
             //command executed with no result    
             case($status === 1):
                 //so process is dead
                 $this->lecho(self::LCR_ER_OLD);
                 $this->free();
                 return true;
+            //command executed with result 0, but output is undefined or in wrong format
+            case(count($res)<2):
+                //result is unexpected
+                $this->errorActions(self::LCR_ER_CHK_FAIL2);
+                return $this->errorStrategyBool();        
             //command executed success 0 result and check for php process
             case($status === 0 and $this->check_marker):
                 if(strpos(end($res), self::PHP_MARKER)===false){
@@ -240,18 +265,27 @@ class ProcessLock{
                     return true;
                 }    
             //command executed success 0 result and check
-            case($status === 0 and isset($res[1])):
+            case($status === 0):
                 $res_out = explode(' ', end($res));
                 $this->lecho(str_replace(['%1','%2'], [end($res_out), $pid], self::LCR_LOСK_VALID));
                 unset($res_out);
                 return false;
             default:
                 //result is VERY unexpected
-                $this->lecho(self::LCR_ER_CHK_FAIL);
-                user_error(self::LCR_ER_CHK_FAIL, E_USER_WARNING);    
-                return true;
+                $this->errorActions(self::LCR_ER_CHK_FAIL);
+                return $this->errorStrategyBool();  
         }
     }
+    
+    /**
+     * action if error happens
+     * @param string $er_txt 
+     */
+    protected function errorActions(string $er_txt){
+        $this->lecho($er_txt);
+        user_error($er_txt, E_USER_WARNING);
+    }
+    
     
     /**
      * locks process with this name $type
@@ -264,7 +298,7 @@ class ProcessLock{
         //check for write
         if(is_writeable($this->dir)){
             if(!file_exists($this->file_name)){
-                file_put_contents($this->file_name,getmypid());
+                file_put_contents($this->file_name, getmypid());
                 $this->lecho(self::LCR_LOСKED);
                 return true;
             }else{
