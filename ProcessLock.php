@@ -28,6 +28,7 @@ class ProcessLock{
     const LCR_ER_WRITE = 'Trying to set not writable path for ProcessLock';
     const LCR_ER_WRITE_TMP = 'Can not write in default dir($this->dir)';
     const LCR_ER_PID = 'Can not check process id with "ps -p". LOCK is imaginary.';
+    const LCR_ER_CHK_FAIL = 'Process check result unexpected.';
     const LCR_ER_NO_PHP = 'Process of pid exist, but not PHP process';
     const LCR_ER_OLD = 'WARNING:Lock file is old. No process of this lock file.';
     /**
@@ -59,10 +60,21 @@ class ProcessLock{
      * @var string locks file directory 
      */
     protected $dir = '/tmp';
+    /**
+     * disable check pid of locked process
+     * @warning ctrl or unexpected end of process and lock is forever live
+     * @var boolean 
+     */
+    protected $check_pid = true;
+    /**
+     * disable for executable files 
+     * for files with #!/usr/bin/env php
+     * @var boolean if true check for php in launch command 
+     */
+    public $check_marker = true;
     
     
     /**
-     * 
      * @param string $in some name of process
      */
     public function __construct(string $in = '') 
@@ -73,8 +85,28 @@ class ProcessLock{
     }
     
     /**
+     * Enable pid live check
+     * @return void 
+     */
+    public function enableProcessIDCheck(bool $show)
+    {
+        $this->check_pid = true;
+    }
+    
+    /**
+     * Do not check dead lock
+     * @warning ctrl or unexpected end of process and lock is forever live
+     * @return void  
+     */
+    public function disableProcessIDCheck(bool $show)
+    {
+        $this->check_pid = false;
+    }
+    
+    /**
      * echo or not to echo output data
      * @param bool $show 
+     * @return void 
      */
     public function setEcho(bool $show)
     {
@@ -143,7 +175,7 @@ class ProcessLock{
     }
     
     /**
-     * check for lock of $type
+     * check for lock of $this->type
      * free zombie lock
      * check for process running by pid
      * 
@@ -151,8 +183,6 @@ class ProcessLock{
      */
     public function check()
     {
-        $res = array();
-        //---
         $this->nameGen();
         if(
             file_exists($this->file_name) 
@@ -160,8 +190,12 @@ class ProcessLock{
             !empty($pid = file_get_contents($this->file_name))
             and 
             is_numeric($pid)
-        ){    
-            return $this->checkForPid($pid);
+        ){  
+            if($this->check_pid === true){
+                return $this->checkForPid($pid);
+            }else{
+                return true;
+            }  
         }else{
             return true;
         }
@@ -170,44 +204,52 @@ class ProcessLock{
     /**
      * check for process with id is running
      * @param int $pid - id of process
-     * @return bool
+     * @return bool // true if pid is dead and process can lock, false if pid is live
      * @throws E_USER_WARNING or E_USER_NOTICE
      */
     private function checkForPid(int $pid):bool
     {
         //get process with pid
-        $res = array_filter(explode("\n",shell_exec('ps -p '.$pid)));
-        //check for output
-        //if empty 'ps -p' is forbidden
-        //if in first line of output do not contains PID string
-        if(empty($res) or strpos($res[0], self::PID)===false){
-            //no valid ps -p output
-            $this->lecho(self::LCR_ER_PID);
-            user_error(self::LCR_ER_PID, E_USER_WARNING);
-            return true;
-        }else{
-            //check for 'ps -p' output
-            switch(true){
-                case(count($res)<2):
-                    //check for process output
-                    $this->lecho(self::LCR_ER_OLD);
+        exec('ps -p '.$pid, $res, $status);
+        //
+        switch(true){
+            //'ps -p' is forbidden or ktulhu
+            case($status > 1):   
+                $this->lecho(self::LCR_ER_PID);
+                user_error(self::LCR_ER_PID, E_USER_WARNING);
+                return true;
+            //command executed with result 0, but output is undefined or in wrong format
+            case(!isset($res[0]) or strpos($res[0], self::PID)===false):
+                //result is unexpected
+                $this->lecho(self::LCR_ER_CHK_FAIL);
+                user_error(self::LCR_ER_CHK_FAIL, E_USER_WARNING);    
+                return true;    
+            //command executed with no result    
+            case($status === 1):
+                //so process is dead
+                $this->lecho(self::LCR_ER_OLD);
+                $this->free();
+                return true;
+            //command executed success 0 result and check for php process
+            case($status === 0 and $this->check_marker):
+                if(strpos(end($res), self::PHP_MARKER)===false){
+                    //process with pid exist but not PHP process / collision
+                    $this->lecho(self::LCR_ER_NO_PHP);
+                    user_error(self::LCR_ER_NO_PHP, E_USER_NOTICE);
                     $this->free();
                     return true;
-                case(true):
-                    //check for process is php
-                    //reset $res !
-                    $res = array_filter(explode(' ',$res[1]));
-                    if(strpos(end($res), self::PHP_MARKER)===false){
-                        //process with pid exist but not PHP process / collision
-                        $this->lecho(self::LCR_ER_NO_PHP);
-                        user_error(self::LCR_ER_NO_PHP, E_USER_NOTICE);
-                        $this->free();
-                        return true;
-                    }
-                default:
-                    $this->lecho(str_replace(['%1','%2'], [end($res), $pid], self::LCR_LOСK_VALID));
-                    return false;
-            }
+                }    
+            //command executed success 0 result and check
+            case($status === 0 and isset($res[1])):
+                $res_out = explode(' ', end($res));
+                $this->lecho(str_replace(['%1','%2'], [end($res_out), $pid], self::LCR_LOСK_VALID));
+                unset($res_out);
+                return false;
+            default:
+                //result is VERY unexpected
+                $this->lecho(self::LCR_ER_CHK_FAIL);
+                user_error(self::LCR_ER_CHK_FAIL, E_USER_WARNING);    
+                return true;
         }
     }
     
