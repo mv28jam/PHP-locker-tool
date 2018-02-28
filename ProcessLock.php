@@ -153,11 +153,17 @@ class ProcessLock{
     
     /**
      * return true and free due to strategy
+     * and action if error happens
+     * @param string $er_txt 
      * @return bool
      */
-    protected function errorStrategy() : bool{
+    protected function errorStrategy(string $er_txt) : bool{
+        //actions
+        $this->lecho($er_txt);
+        user_error($er_txt, E_USER_WARNING);
+        //strategy
         if($this->paranoid_strategy){
-            return true;
+            return false;
         }else{
             $this->free();
             return true;
@@ -237,24 +243,21 @@ class ProcessLock{
         switch(true){
             //'ps -p' is forbidden or ktulhu
             case($status > 1):
-                $this->errorActions(self::LCR_ER_PID);
-                return $this->errorStrategy();
+                return $this->errorStrategy(self::LCR_ER_PID);
             //command executed with result 0, but output is undefined or in wrong format
             case(!isset($res[0]) or strpos($res[0], self::PID)===false):
                 //result is unexpected
-                $this->errorActions(self::LCR_ER_CHK_FAIL);
-                return $this->errorStrategy();    
+                return $this->errorStrategy(self::LCR_ER_CHK_FAIL);    
             //command executed with no result    
             case($status === 1):
                 //so process is dead
                 $this->lecho(self::LCR_ER_OLD);
                 $this->free();
                 return true;
-            //command executed with result 0, but output is undefined or in wrong format
+            // output in wrong format
             case(count($res)<2):
                 //result is unexpected
-                $this->errorActions(self::LCR_ER_CHK_FAIL2);
-                return $this->errorStrategy();        
+                return $this->errorStrategy(self::LCR_ER_CHK_FAIL2);        
             //command executed success 0 result and check for php process
             case($status === 0 and $this->check_marker):
                 if(strpos(end($res), self::PHP_MARKER)===false){
@@ -272,20 +275,9 @@ class ProcessLock{
                 return false;
             default:
                 //result is VERY unexpected
-                $this->errorActions(self::LCR_ER_CHK_FAIL);
-                return $this->errorStrategy();  
+                return $this->errorStrategy(self::LCR_ER_CHK_FAIL);  
         }
     }
-    
-    /**
-     * action if error happens
-     * @param string $er_txt 
-     */
-    protected function errorActions(string $er_txt){
-        $this->lecho($er_txt);
-        user_error($er_txt, E_USER_WARNING);
-    }
-    
     
     /**
      * locks process with this name $type
