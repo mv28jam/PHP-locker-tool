@@ -155,7 +155,7 @@ class ProcessLock{
      * return true and free due to strategy
      * @return bool
      */
-    protected function errorStrategyBool() : bool{
+    protected function errorStrategy() : bool{
         if($this->paranoid_strategy){
             return true;
         }else{
@@ -238,12 +238,12 @@ class ProcessLock{
             //'ps -p' is forbidden or ktulhu
             case($status > 1):
                 $this->errorActions(self::LCR_ER_PID);
-                return $this->errorStrategyBool();
+                return $this->errorStrategy();
             //command executed with result 0, but output is undefined or in wrong format
             case(!isset($res[0]) or strpos($res[0], self::PID)===false):
                 //result is unexpected
                 $this->errorActions(self::LCR_ER_CHK_FAIL);
-                return $this->errorStrategyBool();    
+                return $this->errorStrategy();    
             //command executed with no result    
             case($status === 1):
                 //so process is dead
@@ -254,7 +254,7 @@ class ProcessLock{
             case(count($res)<2):
                 //result is unexpected
                 $this->errorActions(self::LCR_ER_CHK_FAIL2);
-                return $this->errorStrategyBool();        
+                return $this->errorStrategy();        
             //command executed success 0 result and check for php process
             case($status === 0 and $this->check_marker):
                 if(strpos(end($res), self::PHP_MARKER)===false){
@@ -273,7 +273,7 @@ class ProcessLock{
             default:
                 //result is VERY unexpected
                 $this->errorActions(self::LCR_ER_CHK_FAIL);
-                return $this->errorStrategyBool();  
+                return $this->errorStrategy();  
         }
     }
     
