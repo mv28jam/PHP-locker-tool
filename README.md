@@ -13,7 +13,7 @@ $locker->setEcho(false);
 //free lock after execution
 $locker->free();
 ```
-## Yii2 console process lock realisation example
+## Yii2 console process lock realization example
 ```php
 //...
 class ControllerWithLock extends Controller{
